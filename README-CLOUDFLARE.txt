@@ -28,3 +28,5 @@ Use the local URL Wrangler prints. A plain python3 http.server will serve the in
 DATA WARNING: Paddocks and records are stored in browser localStorage. Changing from Netlify to Cloudflare does not automatically migrate records. Export a farm backup on the old site and import it on the new one.
 
 NOTES: NDVI image is rendered over the selected paddock BOUNDING BOX; nearby fields may also be shown. Cloud/missing pixels are transparent. Live satellite retrieval is untested without your Copernicus credentials. The site has no user authentication; protect it before using with confidential real farm records.
+
+V37: Fixed NDVI selector and map access across JavaScript closures. Requires functions/api/ndvi.js to remain in its folder, with SENTINEL_CLIENT_ID and SENTINEL_CLIENT_SECRET configured as Cloudflare Pages secrets. Commit extracted files to GitHub, not the ZIP.

@@ -322,7 +322,7 @@ function initMap(){if(map)return;if(!window.L||!L.Control.Draw||!window.turf){$(
 function openDraw(layer){pending=layer;const area=turf.area(layer.toGeoJSON());$('drawArea').textContent='Calculated area: '+areaString(area);$('drawBlock').value=$('mapBlock').value;$('drawName').value='';$('drawPrompt').style.display='flex';setTimeout(()=>$('drawName').focus(),100);}
 function closeDraw(){pending=null;$('drawPrompt').style.display='none';} $('drawCancel').onclick=closeDraw;$('drawSave').onclick=()=>{const name=$('drawName').value.trim();if(!name||!pending){toast('Enter a paddock name.');return;}const feature=pending.toGeoJSON(),sqm=turf.area(feature);if(!(sqm>0)){toast('Boundary area is invalid.');return;}data.paddocks.push({id:uid(),name,blockId:$('drawBlock').value,crop:$('drawCrop').value,cropHistory:[{crop:$('drawCrop').value,year:activeSeason,date:now(),notes:'Initial mapped crop'}],sqm,geometry:feature.geometry});drawn.removeLayer(pending);closeDraw();persist();refresh();toast('Saved '+name+' — '+areaString(sqm));};
 const cropColours={Wheat:'#C77B20',Barley:'#287FA1',Oats:'#B75E72',Canola:'#E2C400',Lentils:'#8C4FB3','Field peas':'#55B8A6','Faba beans':'#2D754B',Chickpeas:'#D2769D',Pasture:'#29965B',Fallow:'#8B929A',Other:'#647E94'};let multiMode=false,multiSelected=new Set(),multiSaving=false;
-function refreshMap(){if(!map)return;saved.clearLayers();const list=$('mapList');list.replaceChildren();data.paddocks.filter(p=>p.geometry).forEach(p=>{const layer=L.geoJSON({type:'Feature',properties:{},geometry:p.geometry},{style:{color:'#fff',weight:2,fillColor:multiSelected.has(p.id)?'#08a6b7':(cropColours[cropForSeason(p)]||'#78999c'),fillOpacity:.35}}).addTo(saved);layer.bindTooltip(p.name,{permanent:true,direction:'center',className:'hull-paddock-label',opacity:1,interactive:false});layer.on('click',()=>{if(multiMode){multiSelected.has(p.id)?multiSelected.delete(p.id):multiSelected.add(p.id);updateMulti();refreshMap();}else showPaddockProfile(p.id);});if(p.blockId===$('mapBlock').value)item(list,p.name,cropForSeason(p)+' · '+areaString(p.sqm),()=>{map.fitBounds(layer.getBounds());showPaddockProfile(p.id);});});if(!list.children.length)list.textContent='No mapped paddocks for this block.';renderSoilMarkers();renderPrecisionOnMap();const lg=$('cropLegend');lg.replaceChildren();const title=document.createElement('b');title.textContent='Crop colours';lg.append(title);[...new Set(data.paddocks.filter(p=>p.geometry).map(p=>cropForSeason(p)))].sort().forEach(c=>{const r=document.createElement('div');r.className='v21-legend-row';const dot=document.createElement('i');dot.style.background=cropColours[c]||cropColours.Other;r.append(dot,document.createTextNode(c));lg.append(r);});}
+function refreshMap(){if(!map)return;window.dispatchEvent(new Event("hull:paddocks-changed"));saved.clearLayers();const list=$('mapList');list.replaceChildren();data.paddocks.filter(p=>p.geometry).forEach(p=>{const layer=L.geoJSON({type:'Feature',properties:{},geometry:p.geometry},{style:{color:'#fff',weight:2,fillColor:multiSelected.has(p.id)?'#08a6b7':(cropColours[cropForSeason(p)]||'#78999c'),fillOpacity:.35}}).addTo(saved);layer.bindTooltip(p.name,{permanent:true,direction:'center',className:'hull-paddock-label',opacity:1,interactive:false});layer.on('click',()=>{if(multiMode){multiSelected.has(p.id)?multiSelected.delete(p.id):multiSelected.add(p.id);updateMulti();refreshMap();}else showPaddockProfile(p.id);});if(p.blockId===$('mapBlock').value)item(list,p.name,cropForSeason(p)+' · '+areaString(p.sqm),()=>{map.fitBounds(layer.getBounds());showPaddockProfile(p.id);});});if(!list.children.length)list.textContent='No mapped paddocks for this block.';renderSoilMarkers();renderPrecisionOnMap();const lg=$('cropLegend');lg.replaceChildren();const title=document.createElement('b');title.textContent='Crop colours';lg.append(title);[...new Set(data.paddocks.filter(p=>p.geometry).map(p=>cropForSeason(p)))].sort().forEach(c=>{const r=document.createElement('div');r.className='v21-legend-row';const dot=document.createElement('i');dot.style.background=cropColours[c]||cropColours.Other;r.append(dot,document.createTextNode(c));lg.append(r);});}
 
 let profilePaddockId=null;
 function profileEntry(target,title,detail,record){
@@ -566,6 +566,8 @@ function renderPrecisionLayers(){const root=$('precisionLayers');root.replaceChi
 function renderPrecisionOnMap(){if(!map||!window.L)return;if(!precisionGroup)precisionGroup=L.featureGroup().addTo(map);precisionGroup.clearLayers();for(const layer of data.precisionLayers.filter(x=>x.visible)){const values=layer.geojson.features.map(f=>Number(f.properties?.[layer.field])).filter(Number.isFinite);if(!values.length)continue;const min=Math.min(...values),max=Math.max(...values);const colour=n=>{const v=max===min?.5:Math.max(0,Math.min(1,(n-min)/(max-min)));return `hsl(${Math.round(12+v*110)},70%,42%)`;};const geo=L.geoJSON(layer.geojson,{pointToLayer:(f,latlng)=>L.circleMarker(latlng,{radius:5,weight:1,color:'#fff',fillColor:colour(Number(f.properties?.[layer.field])),fillOpacity:.9}),style:f=>({color:colour(Number(f.properties?.[layer.field])),weight:1,fillOpacity:.48}),onEachFeature:(f,l)=>{const value=f.properties?.[layer.field];l.bindPopup('<strong>'+escapeHTML(layer.name)+'</strong><p>'+escapeHTML(layer.field)+': '+escapeHTML(String(value??'Not recorded'))+'</p>');}});geo.addTo(precisionGroup);}}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
+// Read-only bridge for the NDVI controls, which run in a separate script scope.
+window.HullNDVIBridge={getPaddocks:()=>data.paddocks.filter(p=>p.geometry).map(p=>({id:p.id,name:p.name,geometry:p.geometry})),getMap:()=>map};
 })();
 
 </script>
@@ -864,16 +866,18 @@ renderPurchases();renderTrials();pricePreview();
  function populate(){
   const sel=$n('ndviPaddock'), old=sel.value;
   sel.replaceChildren(new Option('Select a paddock',''));
-  if(typeof data==='undefined')return;
-  data.paddocks.filter(p=>p.geometry).forEach(p=>sel.add(new Option(p.name,p.id)));
+  const paddocks=window.HullNDVIBridge?.getPaddocks()||[];
+  paddocks.forEach(p=>sel.add(new Option(p.name,p.id)));
   if([...sel.options].some(o=>o.value===old))sel.value=old;
+  if(!paddocks.length)$n('ndviStatus').textContent='No mapped paddocks available. Draw or import a paddock boundary first.';
  }
- function clear(){if(ndviOverlay&&typeof map!=='undefined'&&map)map.removeLayer(ndviOverlay);ndviOverlay=null;if(ndviUrl)URL.revokeObjectURL(ndviUrl);ndviUrl=null;$n('ndviLegend').style.display='none';}
+ function clear(){const map=window.HullNDVIBridge?.getMap();if(ndviOverlay&&map)map.removeLayer(ndviOverlay);ndviOverlay=null;if(ndviUrl)URL.revokeObjectURL(ndviUrl);ndviUrl=null;$n('ndviLegend').style.display='none';}
  $n('ndviClear').addEventListener('click',()=>{clear();$n('ndviStatus').textContent='NDVI layer cleared.'});
  $n('ndviLoad').addEventListener('click',async()=>{
-  if(typeof map==='undefined'||!map){$n('ndviStatus').textContent='Open the Farm Map and wait for it to load.';return;}
-  populateIfEmpty();
-  const paddock=data.paddocks.find(p=>p.id===$n('ndviPaddock').value&&p.geometry);
+  const map=window.HullNDVIBridge?.getMap();
+  if(!map){$n('ndviStatus').textContent='Open the Farm Map and wait for it to load.';return;}
+  populate();
+  const paddock=(window.HullNDVIBridge?.getPaddocks()||[]).find(p=>p.id===$n('ndviPaddock').value);
   if(!paddock){$n('ndviStatus').textContent='Select a mapped paddock first.';return;}
   const from=$n('ndviFrom').value,to=$n('ndviTo').value;
   if(!from||!to||from>to){$n('ndviStatus').textContent='Choose a valid date range.';return;}
@@ -889,6 +893,7 @@ renderPurchases();renderTrials();pricePreview();
   }catch(e){$n('ndviStatus').textContent=e.message+' On a basic local Mac server, the Cloudflare Function is not available; use Wrangler Pages Dev or a deployed Cloudflare Pages site.'}finally{button.disabled=false}
  });
  function populateIfEmpty(){if($n('ndviPaddock').options.length<2)populate()}
+ window.addEventListener('hull:paddocks-changed',populate);
  document.querySelectorAll('[data-go="map"]').forEach(b=>b.addEventListener('click',()=>setTimeout(populate,200)));
  $n('ndviPaddock').addEventListener('focus',populateIfEmpty);
  setTimeout(populate,300);

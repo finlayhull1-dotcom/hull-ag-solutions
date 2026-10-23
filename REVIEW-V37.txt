@@ -1,0 +1,13 @@
+Hull Ag Solutions V37 review (2026-10-23)
+
+CONFIRMED BUG: NDVI module referenced data and map scoped inside the main app IIFE, making them unavailable. This prevented the paddock dropdown and NDVI map overlay from working. Fixed using a read-only bridge and a paddock-change event.
+
+CONFIRMED DEPLOYMENT ISSUE: GitHub must contain index.html and functions/api/ndvi.js in the correct paths. Uploading only a ZIP or placing ndvi.js in repository root will not deploy the Pages Function.
+
+SECURITY: Sentinel OAuth credentials must be Cloudflare secrets, never in public JavaScript or GitHub. Current endpoint is publicly callable and can consume Sentinel credits; add access control/rate limiting before public use.
+
+DATA: Main farm data is saved to browser localStorage, not automatically synced between Netlify, Cloudflare, or devices. Export a backup before migrating. Supabase is an optional separate beta, not automatic cloud backup.
+
+OTHER RISKS: External Leaflet/Esri imagery requires internet and suitable licensing. Sentinel NDVI imagery is bounded by paddock rectangle rather than clipped to exact paddock shape. Date and imagery availability may cause empty results. Imported precision layers and large backups may exceed browser storage.
+
+VALIDATION: Static JS syntax and ZIP integrity checked. Live Sentinel requests, login, browser rendering, and full workflows require testing with your Cloudflare deployment and credentials.
