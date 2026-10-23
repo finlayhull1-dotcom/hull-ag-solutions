@@ -30,7 +30,10 @@ async function accessToken(env) {
 const EVALSCRIPT = `//VERSION=3
 function setup() {
   return {
-    input: [{ bands: ['B04','B08','SCL','dataMask'], units: 'REFLECTANCE' }],
+    input: [
+  { bands: ["B04", "B08"], units: "REFLECTANCE" },
+  { bands: ["SCL"], units: "DN" }
+],
     output: { bands: 4, sampleType: 'AUTO' }
   };
 }
